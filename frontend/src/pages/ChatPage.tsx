@@ -90,11 +90,11 @@ const ChatPage: React.FC = () => {
           </>
         ) : (
           messages.map((message, idx) =>
-            message.content.body !== '' ? (
+            (message.content.body !== '' && message.role != 'system') ? (
               <div
                 key={idx}
                 className={`${
-                  message.role === 'assistant' ? 'bg-aws-squid-ink/5' : ''
+                  (message.role === 'assistant' || message.role === 'ctx') ? 'bg-aws-squid-ink/5' : ''
                 }`}>
                 <ChatMessage
                   chatContent={message}

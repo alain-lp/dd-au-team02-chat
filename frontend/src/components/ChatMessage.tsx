@@ -89,19 +89,19 @@ const ChatMessage: React.FC<Props> = (props) => {
       </div>
 
       <div className="order-first col-span-12 flex lg:order-none lg:col-span-8 lg:col-start-3">
-        {chatContent?.role === 'user' && (
+        {(chatContent?.role === 'user' || chatContent?.role === 'ctx-user') && (
           <div className="h-min rounded bg-aws-sea-blue p-2 text-xl text-white">
             <PiUserFill />
           </div>
         )}
-        {chatContent?.role === 'assistant' && (
+        {(chatContent?.role === 'assistant' ||  chatContent?.role === 'ctx') && (
           <div className="min-w-[2.5rem] max-w-[2.5rem]">
             <img src={MLIcon} />
           </div>
         )}
 
         <div className="ml-5 grow ">
-          {chatContent?.role === 'user' && !isEdit && (
+          {(chatContent?.role === 'user' || chatContent?.role === 'ctx-user') && !isEdit && (
             <div>
               {chatContent.content.body.split('\n').map((c, idx) => (
                 <div key={idx}>{c}</div>
@@ -129,7 +129,7 @@ const ChatMessage: React.FC<Props> = (props) => {
             </div>
           )}
 
-          {chatContent?.role === 'assistant' && !props.loading && (
+          {(chatContent?.role === 'assistant' || chatContent?.role === 'ctx') && !props.loading && (
             <Markdown>{chatContent.content.body}</Markdown>
           )}
           {props.loading && (
@@ -150,7 +150,7 @@ const ChatMessage: React.FC<Props> = (props) => {
               <PiNotePencil />
             </ButtonIcon>
           )}
-          {chatContent?.role === 'assistant' && !props.loading && (
+          {(chatContent?.role === 'assistant' || chatContent?.role === 'ctx') && !props.loading && (
             <>
               <ButtonCopy
                 className="mr-0.5 text-gray-400"

@@ -20,11 +20,15 @@ def get_buffer_string(conversations: dict[str, MessageModel]) -> str:
             prefix = "Human: "
         elif conversation.role == "system":
             prefix = "System: "
+        elif conversation.role == "ctx":
+            prefix = "Mode information: "
+        elif conversation.role == "ctx-user":
+            prefix = "Mode selection: "         
         else:
             raise ValueError(f"Unsupported role: {conversation.role}")
 
-        if conversation.role != "system":
-            # Ignore system messages (currently `system` is dummy)
+        # Ignore system messages (currently `context` is dummy)
+        if conversation.role != "ctx" or conversation.role != 'ctx-user':
             message = f"{prefix}{conversation.content.body}"
             string_messages.append(message)
 

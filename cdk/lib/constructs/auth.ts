@@ -17,15 +17,16 @@ export class Auth extends Construct {
         requireDigits: true,
         minLength: 8,
       },
-      selfSignUpEnabled: true,
+      selfSignUpEnabled: false,
       signInAliases: {
-        username: false,
+        username: true,
         email: true,
       },
     });
 
     const client = userPool.addClient(`Client`, {
       idTokenValidity: Duration.days(1),
+      accessTokenValidity: Duration.days(1),
       authFlows: {
         userPassword: true,
         userSrp: true,

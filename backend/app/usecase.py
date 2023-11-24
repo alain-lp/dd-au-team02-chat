@@ -1,6 +1,8 @@
 import json
 import logging
 from datetime import datetime
+from app.context import get_context_setting_prompt, get_secondary_context_prompt
+import app.context
 
 from app.bedrock import _create_body, get_model_id, invoke
 from app.repositories.conversation import (
@@ -14,7 +16,7 @@ from app.utils import get_buffer_string
 from ulid import ULID
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 
 def prepare_conversation(
@@ -40,7 +42,7 @@ def prepare_conversation(
                     role="system",
                     content=ContentModel(
                         content_type="text",
-                        body="",
+                        body=get_context_setting_prompt(),
                     ),
                     model=chat_input.message.model,
                     children=[],
@@ -52,25 +54,36 @@ def prepare_conversation(
         )
         parent_id = "system"
 
-    # Append user chat input to the conversation
-    message_id = str(ULID())
-    new_message = MessageModel(
-        role=chat_input.message.role,
-        content=ContentModel(
-            content_type=chat_input.message.content.content_type,
-            body=chat_input.message.content.body,
-        ),
-        model=chat_input.message.model,
-        children=[],
-        parent=parent_id,
-        create_time=datetime.now().timestamp(),
-    )
-    conversation.message_map[message_id] = new_message
+    user_input = chat_input.message.content.body
 
-    if conversation.message_map.get(chat_input.message.parent_message_id) is not None:
-        conversation.message_map[chat_input.message.parent_message_id].children.append(
-            message_id
-        )
+    # List contexts
+    if user_input == app.context.LIST_CONTEXT_COMMAND:
+       logger.info("USER QUERY FOR MODES")
+       query_id, query_message = create_context_message(user_input, chat_input, parent_id, True) 
+       append_msg_to_conversation(conversation, query_message, query_id, parent_id)
+
+       available = app.context.get_available_secondary_contexts()
+       response_text = f"Available modes are: {available}"
+       message_id, message = create_context_message(response_text, chat_input, query_id, False) 
+       append_msg_to_conversation(conversation, message, message_id, query_id)
+
+
+
+    # Select a new context
+    elif user_input.startswith(app.context.SWAP_CONTEXT_COMMAND):
+        selected_mode = user_input.split()[-1]
+        logger.info(f"USER SETS MODE TO '{selected_mode}'")
+        select_id, select_message = create_context_message(user_input, chat_input, parent_id, True) 
+        append_msg_to_conversation(conversation, select_message, select_id, parent_id)
+        
+        message_id, message = create_secondary_context_message(selected_mode, chat_input, select_id)
+        append_msg_to_conversation(conversation, message, message_id, parent_id)
+
+
+    # Append user chat input to the conversation
+    else:
+        message_id, message = append_user_input(chat_input, conversation, parent_id)
+        append_msg_to_conversation(conversation, message, message_id, parent_id)
 
     return (message_id, conversation)
 
@@ -120,29 +133,31 @@ def chat(user_id: str, chat_input: ChatInput) -> ChatOutput:
     )
     messages.append(chat_input.message)
 
-    # Invoke Bedrock
-    prompt = get_buffer_string(messages)
-    reply_txt = invoke(prompt=prompt, model=chat_input.message.model)
+    # Invoke Bedrock if needed
+    if conversation.message_map[conversation.last_message_id].role.startswith('user'):
+        prompt = get_buffer_string(messages)
+        reply_txt = invoke(prompt=prompt, model=chat_input.message.model)
 
-    # Issue id for new assistant message
-    assistant_msg_id = str(ULID())
-    # Append bedrock output to the existing conversation
-    message = MessageModel(
-        role="assistant",
-        content=ContentModel(content_type="text", body=reply_txt),
-        model=chat_input.message.model,
-        children=[],
-        parent=user_msg_id,
-        create_time=datetime.now().timestamp(),
-    )
-    conversation.message_map[assistant_msg_id] = message
+        # Issue id for new assistant message
+        assistant_msg_id = str(ULID())
+        # Append bedrock output to the existing conversation
+        message = MessageModel(
+            role="assistant",
+            content=ContentModel(content_type="text", body=reply_txt),
+            model=chat_input.message.model,
+            children=[],
+            parent=user_msg_id,
+            create_time=datetime.now().timestamp(),
+        )
+        conversation.message_map[assistant_msg_id] = message
 
-    # Append children to parent
-    conversation.message_map[user_msg_id].children.append(assistant_msg_id)
-    conversation.last_message_id = assistant_msg_id
+        # Append children to parent
+        append_msg_to_conversation(conversation, message, assistant_msg_id)
+    else:
+        message = conversation.message_map[conversation.last_message_id]
 
     # Store updated conversation
-    store_conversation(user_id, conversation)
+    store_conversation(user_id, conversation)        
 
     output = ChatOutput(
         conversation_id=conversation.id,
@@ -200,3 +215,65 @@ def propose_conversation_title(
     reply_txt = invoke(prompt=prompt, model=model)
     reply_txt = reply_txt.replace("\n", "")
     return reply_txt
+
+def create_secondary_context_message(type, chat_input, parent_id):
+    message_id = str(ULID())
+    new_message = MessageModel(
+        role="system",
+        content=ContentModel(
+            content_type=chat_input.message.content.content_type,
+            body=get_secondary_context_prompt(type),
+        ),
+        model=chat_input.message.model,
+        children=[],
+        parent=parent_id,
+        create_time=datetime.now().timestamp(),
+    )
+    return (message_id, new_message)
+
+def create_context_message(body, chat_input, parent_id, human = False):
+    if human:
+        role = 'ctx-user'
+    else:
+        role = 'ctx'    
+    
+    message_id = str(ULID())
+    new_message = MessageModel(
+        role=role,
+        content=ContentModel(
+            content_type=chat_input.message.content.content_type,
+            body=body,
+        ),
+        model=chat_input.message.model,
+        children=[],
+        parent=parent_id,
+        create_time=datetime.now().timestamp(),
+    )
+    return (message_id, new_message)
+
+def append_msg_to_conversation(conversation, msg, msg_id, parent_id = None):
+    conversation.message_map[msg_id] = msg
+   
+    if parent_id is None:
+        parent_id = conversation.last_message_id
+
+    if conversation.message_map.get(parent_id) is not None:
+        conversation.message_map[parent_id].children.append(msg_id)
+
+    conversation.last_message_id = msg_id   
+
+def append_user_input(chat_input, conversation, parent_id):
+    message_id = str(ULID())
+    new_message = MessageModel(
+        role=chat_input.message.role,
+        content=ContentModel(
+            content_type=chat_input.message.content.content_type,
+            body=chat_input.message.content.body,
+        ),
+        model=chat_input.message.model,
+        children=[],
+        parent=parent_id,
+        create_time=datetime.now().timestamp(),
+    )
+    return (message_id, new_message)
+    

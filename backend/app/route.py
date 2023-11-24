@@ -24,13 +24,11 @@ router = APIRouter()
 
 @router.get("/health")
 def health():
-    """ヘルスチェック用"""
     return {"status": "ok"}
 
 
 @router.post("/conversation", response_model=ChatOutput)
 def post_message(request: Request, chat_input: ChatInput):
-    """チャットメッセージを送信する"""
     current_user: User = request.state.current_user
 
     output = chat(user_id=current_user.id, chat_input=chat_input)
@@ -39,7 +37,6 @@ def post_message(request: Request, chat_input: ChatInput):
 
 @router.get("/conversation/{conversation_id}", response_model=Conversation)
 def get_conversation(request: Request, conversation_id: str):
-    """一連の会話履歴を取得する"""
     current_user: User = request.state.current_user
 
     conversation = find_conversation_by_id(current_user.id, conversation_id)

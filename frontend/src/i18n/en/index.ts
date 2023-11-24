@@ -1,7 +1,7 @@
 const translation = {
   translation: {
     app: {
-      name: 'Bedrock Claude Chat',
+      name: 'Disovery Day Team 2 LittleLanguageModel Demo',
       inputMessage: 'Send a message',
     },
     deleteDialog: {

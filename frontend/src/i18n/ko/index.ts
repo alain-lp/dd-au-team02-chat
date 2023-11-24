@@ -3,7 +3,7 @@ import en from '../en';
 const translation: typeof en = {
   translation: {
     app: {
-      name: 'Bedrock Claude Chat',
+      name: 'Disovery Day Team 2 LittleLanguageModel Demo',
       inputMessage: '입력해 주십시오',
     },
     deleteDialog: {

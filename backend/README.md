@@ -15,9 +15,9 @@ pip install -r ./requirements.txt
 - Configure environment variables
 
 ```
-export TABLE_NAME=BedrockChatStack-DatabaseConversationTablexxxx
-export ACCOUNT=yyyy
-export REGION=ap-northeast-1
+export TABLE_NAME=BedrockChatStack-DatabaseConversationTable03F3FD7A-RMCEHJG7OV56
+export ACCOUNT=916537346432
+export REGION=us-east-1
 export BEDROCK_REGION=us-east-1
 ```
 
